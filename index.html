@@ -48,7 +48,7 @@
     </table>
 
     <script>
-        // CONFIGURACIÓN CON TUS LLAVES
+        // CONFIGURACIÓN FINAL - KEVIN
         const AWS_ACCESS_KEY = 'AKIAXC7IGIXJJUX23P73';
         const AWS_SECRET_KEY = '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';
         const API_URL = 'https://baoqf58tr2.execute-api.us-east-1.amazonaws.com/'; 
@@ -76,12 +76,12 @@
                     body: JSON.stringify({ fecha: fecha })
                 });
 
-                status.innerText = "Consultando Athena (Buscando sustos)...";
+                status.innerText = "Consultando Athena (Buscando asteroides)...";
                 
-                // CONSULTA CON TUS NOMBRES DE COLUMNA REALES
+                // CONSULTA CON EL CAST CORREGIDO PARA EVITAR TYPE_MISMATCH
                 const sql = `SELECT nombre_oficial, comparador_estadios, km_por_hora, distancia_proxima_km, es_amenaza_real 
                              FROM "nasa_db"."silver_asteroides" 
-                             WHERE fecha_del_sustito = '${fecha}'`;
+                             WHERE fecha_del_sustito = CAST('${fecha}' AS DATE)`;
 
                 const data = await ejecutarQuery(sql);
                 renderizar(data);
@@ -120,7 +120,7 @@
             tabla.innerHTML = "";
 
             if (filas.length === 0) {
-                tabla.innerHTML = "<tr><td colspan='5'>No hay asteroides registrados para hoy. ¡Día tranquilo!</td></tr>";
+                tabla.innerHTML = "<tr><td colspan='5'>No hay asteroides para esta fecha. ¡Día tranquilo!</td></tr>";
                 return;
             }
 
