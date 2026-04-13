@@ -13,11 +13,11 @@
         input[type="date"] { background: transparent; border: 1px solid var(--cyan); color: #fff; padding: 8px; border-radius: 5px; outline: none; }
         button { background: var(--cyan); border: none; padding: 10px 25px; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-left: 10px; }
         button:hover { box-shadow: 0 0 20px var(--cyan); transform: scale(1.05); }
-        .status { color: var(--pink); font-weight: bold; margin-bottom: 20px; height: 20px; text-transform: uppercase; }
-        table { width: 90%; margin: 0 auto; border-collapse: collapse; background: rgba(0,255,255,0.05); border-radius: 15px; overflow: hidden; }
+        .status { color: var(--pink); font-weight: bold; margin-bottom: 20px; height: 20px; text-transform: uppercase; font-size: 0.9em; }
+        table { width: 90%; margin: 0 auto; border-collapse: collapse; background: rgba(0,255,255,0.05); border-radius: 15px; overflow: hidden; margin-bottom: 50px; }
         th { color: var(--cyan); border-bottom: 2px solid var(--cyan); padding: 15px; text-transform: uppercase; }
         td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
-        .danger { color: #ff4444; font-weight: bold; }
+        .danger { color: #ff4444; font-weight: bold; text-shadow: 0 0 5px #ff4444; }
         .safe { color: #44ff44; }
     </style>
 </head>
@@ -44,12 +44,11 @@
                 <th>Estado</th>
             </tr>
         </thead>
-        <tbody id="tablaCuerpo">
-            </tbody>
+        <tbody id="tablaCuerpo"></tbody>
     </table>
 
     <script>
-        // 1. CONFIGURACIÓN - DATOS CARGADOS AUTOMÁTICAMENTE
+        // CONFIGURACIÓN CON TUS LLAVES
         const AWS_ACCESS_KEY = 'AKIAXC7IGIXJJUX23P73';
         const AWS_SECRET_KEY = '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';
         const API_URL = 'https://baoqf58tr2.execute-api.us-east-1.amazonaws.com/'; 
@@ -66,33 +65,31 @@
         async function procesar() {
             const fecha = document.getElementById('fechaInput').value;
             const status = document.getElementById('statusLabel');
-            const tabla = document.getElementById('tablaCuerpo');
             
-            if (!fecha) return alert("Elegí una fecha, loco");
+            if (!fecha) return alert("Elegí una fecha, Kevin");
 
             try {
                 status.innerText = "Sincronizando con la NASA...";
-                
-                // Llamada a la Lambda
                 await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ fecha: fecha })
                 });
 
-                status.innerText = "Consultando base de datos Athena...";
+                status.innerText = "Consultando Athena (Buscando sustos)...";
                 
-                const sql = `SELECT name, estimated_diameter_max_km, velocity_km_h, miss_distance_km, is_potentially_hazardous_asteroid 
+                // CONSULTA CON TUS NOMBRES DE COLUMNA REALES
+                const sql = `SELECT nombre_oficial, comparador_estadios, km_por_hora, distancia_proxima_km, es_amenaza_real 
                              FROM "nasa_db"."silver_asteroides" 
-                             WHERE fecha_archivo = '${fecha}'`;
+                             WHERE fecha_del_sustito = '${fecha}'`;
 
                 const data = await ejecutarQuery(sql);
                 renderizar(data);
-                status.innerText = "Radar actualizado";
+                status.innerText = "Radar Mendoza Online";
 
             } catch (err) {
                 console.error(err);
-                status.innerText = "Error en los sensores espaciales";
+                status.innerText = "Falla en el radar";
                 alert("Error: " + err.message);
             }
         }
@@ -114,7 +111,6 @@
                 if (state === "FAILED") throw new Error("Athena falló: " + check.QueryExecution.Status.StateChangeReason);
                 await new Promise(r => setTimeout(r, 1000));
             }
-
             return await athena.getQueryResults({QueryExecutionId: executionId}).promise();
         }
 
@@ -124,22 +120,21 @@
             tabla.innerHTML = "";
 
             if (filas.length === 0) {
-                tabla.innerHTML = "<tr><td colspan='5'>No hay datos para esta fecha. Intentá sincronizar de nuevo.</td></tr>";
+                tabla.innerHTML = "<tr><td colspan='5'>No hay asteroides registrados para hoy. ¡Día tranquilo!</td></tr>";
                 return;
             }
 
             filas.forEach(row => {
-                const [name, diam, vel, dist, haz] = row.Data.map(d => d.VarCharValue);
-                const esPeligroso = haz === "true";
-                const estadios = (parseFloat(diam) / 0.2).toFixed(2);
+                const [nombre, estadios, velocidad, distancia, amenaza] = row.Data.map(d => d.VarCharValue);
+                const esPeligroso = amenaza.toLowerCase() === "true" || amenaza === "1";
 
                 tabla.innerHTML += `
                     <tr>
-                        <td>${name}</td>
-                        <td>${estadios} 🏟️</td>
-                        <td>${Math.round(vel)} km/h</td>
-                        <td>${(parseFloat(dist)/1000000).toFixed(2)} M km</td>
-                        <td class="${esPeligroso ? 'danger' : 'safe'}">${esPeligroso ? 'PELIGRO' : 'SEGURO'}</td>
+                        <td>${nombre}</td>
+                        <td>${parseFloat(estadios).toFixed(2)} 🏟️</td>
+                        <td>${Math.round(parseFloat(velocidad))} km/h</td>
+                        <td>${(parseFloat(distancia)/1000000).toFixed(2)} M km</td>
+                        <td class="${esPeligroso ? 'danger' : 'safe'}">${esPeligroso ? '¡AMENAZA!' : 'SEGURO'}</td>
                     </tr>
                 `;
             });
