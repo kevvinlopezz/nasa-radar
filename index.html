@@ -49,10 +49,10 @@
     </table>
 
     <script>
-        // 1. CONFIGURACIÓN - PEGA TUS DATOS AQUÍ
-        const AWS_ACCESS_KEY = 'TU_ACCESS_KEY';
-        const AWS_SECRET_KEY = 'TU_SECRET_KEY';
-        const API_URL = 'URL_DE_TU_API_GATEWAY'; // La que termina en .amazonaws.com/
+        // 1. CONFIGURACIÓN - DATOS CARGADOS AUTOMÁTICAMENTE
+        const AWS_ACCESS_KEY = 'AKIAXC7IGIXJJUX23P73';
+        const AWS_SECRET_KEY = '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';
+        const API_URL = 'https://baoqf58tr2.execute-api.us-east-1.amazonaws.com/'; 
         const S3_OUTPUT = 's3://kevin-nasa-data-lake-virginia/athena-results/';
 
         AWS.config.update({
@@ -73,10 +73,11 @@
             try {
                 status.innerText = "Sincronizando con la NASA...";
                 
-                // Llamada a la Lambda para asegurar que el JSON exista en S3
+                // Llamada a la Lambda
                 await fetch(API_URL, {
                     method: 'POST',
-                    body: json.stringify({ fecha: fecha })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fecha: fecha })
                 });
 
                 status.innerText = "Consultando base de datos Athena...";
@@ -100,7 +101,7 @@
             const params = {
                 QueryString: sql,
                 ResultConfiguration: { OutputLocation: S3_OUTPUT },
-                WorkGroup: 'primary' // Esto arregla el error de ejecución
+                WorkGroup: 'primary'
             };
 
             const start = await athena.startQueryExecution(params).promise();
@@ -122,11 +123,14 @@
             const tabla = document.getElementById('tablaCuerpo');
             tabla.innerHTML = "";
 
+            if (filas.length === 0) {
+                tabla.innerHTML = "<tr><td colspan='5'>No hay datos para esta fecha. Intentá sincronizar de nuevo.</td></tr>";
+                return;
+            }
+
             filas.forEach(row => {
                 const [name, diam, vel, dist, haz] = row.Data.map(d => d.VarCharValue);
                 const esPeligroso = haz === "true";
-                
-                // Conversión a estadios (aprox 0.2km)
                 const estadios = (parseFloat(diam) / 0.2).toFixed(2);
 
                 tabla.innerHTML += `
