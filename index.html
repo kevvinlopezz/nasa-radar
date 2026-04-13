@@ -2,194 +2,143 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Radar Mendoza - Misión Tiempo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vigilancia Espacial Mendoza</title>
     <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1212.0.min.js"></script>
     <style>
         :root { --cyan: #0ff; --pink: #f0f; }
-        body {
-            background-color: #050505;
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: #fff;
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            transition: background-image 1s;
-        }
-        .overlay {
-            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.9) 100%);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 30px;
-        }
-        .controls {
-            background: rgba(255, 0, 255, 0.1);
-            padding: 20px;
-            border-radius: 50px;
-            border: 1px solid var(--pink);
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-        }
-        input[type="date"] {
-            background: #222;
-            border: 1px solid var(--cyan);
-            color: #fff;
-            padding: 10px;
-            border-radius: 5px;
-        }
-        button {
-            background: var(--cyan);
-            color: #000;
-            border: none;
-            padding: 10px 25px;
-            border-radius: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
-        .table-container {
-            width: 90%;
-            max-width: 1000px;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(15px);
-            border-radius: 15px;
-            border: 1px solid rgba(0,255,255,0.2);
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #333; }
-        th { color: var(--cyan); }
-        .hazard { color: #ff3366; font-weight: bold; }
-        #loading {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); color: var(--pink);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 2000; display: none; font-size: 1.5em;
-        }
+        body { background-color: #050505; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; text-align: center; }
+        .header { padding: 40px; text-shadow: 0 0 10px var(--cyan); }
+        .control-panel { background: rgba(255,0,255,0.1); border: 2px solid var(--pink); border-radius: 50px; display: inline-block; padding: 10px 30px; margin-bottom: 40px; }
+        input[type="date"] { background: transparent; border: 1px solid var(--cyan); color: #fff; padding: 8px; border-radius: 5px; outline: none; }
+        button { background: var(--cyan); border: none; padding: 10px 25px; border-radius: 25px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-left: 10px; }
+        button:hover { box-shadow: 0 0 20px var(--cyan); transform: scale(1.05); }
+        .status { color: var(--pink); font-weight: bold; margin-bottom: 20px; height: 20px; text-transform: uppercase; }
+        table { width: 90%; margin: 0 auto; border-collapse: collapse; background: rgba(0,255,255,0.05); border-radius: 15px; overflow: hidden; }
+        th { color: var(--cyan); border-bottom: 2px solid var(--cyan); padding: 15px; text-transform: uppercase; }
+        td { padding: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .danger { color: #ff4444; font-weight: bold; }
+        .safe { color: #44ff44; }
     </style>
 </head>
 <body>
-    <div id="loading">SINCRONIZANDO CON LA NASA...</div>
 
-    <div class="overlay">
+    <div class="header">
         <h1>VIGILANCIA ESPACIAL MENDOZA</h1>
-        
-        <div class="controls">
-            <input type="date" id="input-fecha">
-            <button onclick="cargarDashboard()">SINCRONIZAR FECHA</button>
-        </div>
-
-        <div id="foto-info" style="margin-bottom:20px; color: var(--cyan)"></div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Objeto</th>
-                        <th>Tamaño (Estadios)</th>
-                        <th>Velocidad</th>
-                        <th>Distancia</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody id="cuerpo-tabla"></tbody>
-            </table>
-        </div>
     </div>
 
+    <div class="control-panel">
+        <input type="date" id="fechaInput">
+        <button onclick="procesar()">SINCRONIZAR FECHA</button>
+    </div>
+
+    <div id="statusLabel" class="status"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Objeto</th>
+                <th>Tamaño (Estadios)</th>
+                <th>Velocidad</th>
+                <th>Distancia</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody id="tablaCuerpo">
+            </tbody>
+    </table>
+
     <script>
+        // 1. CONFIGURACIÓN - PEGA TUS DATOS AQUÍ
+        const AWS_ACCESS_KEY = 'TU_ACCESS_KEY';
+        const AWS_SECRET_KEY = 'TU_SECRET_KEY';
+        const API_URL = 'URL_DE_TU_API_GATEWAY'; // La que termina en .amazonaws.com/
+        const S3_OUTPUT = 's3://kevin-nasa-data-lake-virginia/athena-results/';
+
         AWS.config.update({
-            accessKeyId: 'AKIAXC7IGIXJJUX23P73',
-            secretAccessKey: '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',
+            accessKeyId: AWS_ACCESS_KEY,
+            secretAccessKey: AWS_SECRET_KEY,
             region: 'us-east-1'
         });
 
         const athena = new AWS.Athena();
-        const S3_OUTPUT = 's3://kevin-nasa-data-lake-virginia/athena-results/';
-        const API_URL = 'https://baoqf58tr2.execute-api.us-east-1.amazonaws.com';
+
+        async function procesar() {
+            const fecha = document.getElementById('fechaInput').value;
+            const status = document.getElementById('statusLabel');
+            const tabla = document.getElementById('tablaCuerpo');
+            
+            if (!fecha) return alert("Elegí una fecha, loco");
+
+            try {
+                status.innerText = "Sincronizando con la NASA...";
+                
+                // Llamada a la Lambda para asegurar que el JSON exista en S3
+                await fetch(API_URL, {
+                    method: 'POST',
+                    body: json.stringify({ fecha: fecha })
+                });
+
+                status.innerText = "Consultando base de datos Athena...";
+                
+                const sql = `SELECT name, estimated_diameter_max_km, velocity_km_h, miss_distance_km, is_potentially_hazardous_asteroid 
+                             FROM "nasa_db"."silver_asteroides" 
+                             WHERE fecha_archivo = '${fecha}'`;
+
+                const data = await ejecutarQuery(sql);
+                renderizar(data);
+                status.innerText = "Radar actualizado";
+
+            } catch (err) {
+                console.error(err);
+                status.innerText = "Error en los sensores espaciales";
+                alert("Error: " + err.message);
+            }
+        }
 
         async function ejecutarQuery(sql) {
             const params = {
                 QueryString: sql,
-                ResultConfiguration: { OutputLocation: S3_OUTPUT }
+                ResultConfiguration: { OutputLocation: S3_OUTPUT },
+                WorkGroup: 'primary' // Esto arregla el error de ejecución
             };
+
             const start = await athena.startQueryExecution(params).promise();
             const executionId = start.QueryExecutionId;
 
-            let status = "RUNNING";
-            while (status === "RUNNING" || status === "QUEUED") {
+            let state = "RUNNING";
+            while (state === "RUNNING" || state === "QUEUED") {
                 const check = await athena.getQueryExecution({QueryExecutionId: executionId}).promise();
-                status = check.QueryExecution.Status.State;
-                await new Promise(r => setTimeout(r, 800));
+                state = check.QueryExecution.Status.State;
+                if (state === "FAILED") throw new Error("Athena falló: " + check.QueryExecution.Status.StateChangeReason);
+                await new Promise(r => setTimeout(r, 1000));
             }
+
             return await athena.getQueryResults({QueryExecutionId: executionId}).promise();
         }
 
-        async function cargarDashboard() {
-            const fecha = document.getElementById('input-fecha').value;
-            if(!fecha) return alert("Elegí una fecha, Kevin");
+        function renderizar(data) {
+            const filas = data.ResultSet.Rows.slice(1);
+            const tabla = document.getElementById('tablaCuerpo');
+            tabla.innerHTML = "";
 
-            const loader = document.getElementById('loading');
-            loader.style.display = 'flex';
+            filas.forEach(row => {
+                const [name, diam, vel, dist, haz] = row.Data.map(d => d.VarCharValue);
+                const esPeligroso = haz === "true";
+                
+                // Conversión a estadios (aprox 0.2km)
+                const estadios = (parseFloat(diam) / 0.2).toFixed(2);
 
-            try {
-                // 1. Ver si ya existe en Athena
-                let res = await ejecutarQuery(`SELECT * FROM "nasa_db"."silver_asteroides" WHERE CAST(fecha_del_sustito AS VARCHAR) = '${fecha}'`);
-
-                // 2. Si no existe, llamar a la Lambda
-                if (res.ResultSet.Rows.length <= 1) {
-                    loader.innerText = "FECHA NUEVA DETECTADA. DESCARGANDO DE NASA...";
-                    
-                    // LLAMADA CORREGIDA AL API GATEWAY
-                    await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ "fecha": fecha }) // Enviamos el JSON correcto
-                    });
-
-                    loader.innerText = "PROCESANDO... ESPERÁ 8 SEGUNDOS";
-                    await new Promise(r => setTimeout(r, 8000));
-                    
-                    res = await ejecutarQuery(`SELECT * FROM "nasa_db"."silver_asteroides" WHERE CAST(fecha_del_sustito AS VARCHAR) = '${fecha}'`);
-                }
-
-                // 3. Renderizar resultados
-                renderizar(res.ResultSet.Rows);
-
-                // 4. Foto de fondo
-                const resF = await ejecutarQuery(`SELECT * FROM "nasa_db"."vista_foto_hoy" WHERE fecha = '${fecha}' LIMIT 1`);
-                if(resF.ResultSet.Rows.length > 1) {
-                    const d = resF.ResultSet.Rows[1].Data;
-                    document.body.style.backgroundImage = `url('${d[1].VarCharValue}')`;
-                    document.getElementById('foto-info').innerText = `IMAGEN: ${d[2].VarCharValue}`;
-                }
-
-            } catch (e) {
-                console.error(e);
-                alert("Error de conexión. Revisá la consola (F12)");
-            } finally {
-                loader.style.display = 'none';
-            }
-        }
-
-        function renderizar(rows) {
-            const tbody = document.getElementById('cuerpo-tabla');
-            tbody.innerHTML = rows.length > 1 ? '' : '<tr><td colspan="5">No se encontraron datos para esta fecha.</td></tr>';
-            
-            for (let i = 1; i < rows.length; i++) {
-                const col = rows[i].Data;
-                const tr = document.createElement('tr');
-                const peli = col[6].VarCharValue === 'true';
-                tr.innerHTML = `
-                    <td>${col[0].VarCharValue}</td>
-                    <td>${col[2].VarCharValue}</td>
-                    <td>${Number(col[3].VarCharValue).toLocaleString()} km/h</td>
-                    <td>${col[5].VarCharValue} Lunas</td>
-                    <td class="${peli ? 'hazard' : ''}">${peli ? 'PELIGRO' : 'SEGURO'}</td>
+                tabla.innerHTML += `
+                    <tr>
+                        <td>${name}</td>
+                        <td>${estadios} 🏟️</td>
+                        <td>${Math.round(vel)} km/h</td>
+                        <td>${(parseFloat(dist)/1000000).toFixed(2)} M km</td>
+                        <td class="${esPeligroso ? 'danger' : 'safe'}">${esPeligroso ? 'PELIGRO' : 'SEGURO'}</td>
+                    </tr>
                 `;
-                tbody.appendChild(tr);
-            }
+            });
         }
     </script>
 </body>
